@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
   /* Set chaddr MAC address */
   if (arg_chaddr != NULL) {
     int len = ETHER_ADDR_LEN;
-    chaddr = libnet_hex_aton((int8_t *)arg_chaddr, &len);
+    chaddr = libnet_hex_aton(arg_chaddr, &len);
     if (chaddr == NULL) {
       if (verbosity > 0)
         printf("Invalid chaddr MAC address specified (%s)\n", arg_chaddr);
@@ -433,7 +433,7 @@ int main(int argc, char **argv) {
 
   if (arg_ether_dst != NULL) {
     int l = ETHER_ADDR_LEN;
-    ether_dst = libnet_hex_aton((int8_t *)arg_ether_dst, &l);
+    ether_dst = libnet_hex_aton(arg_ether_dst, &l);
     if (ether_dst == NULL) {
       if (verbosity > 0)
         printf("Error: invalid ethernet destination MAC specified (was: %s)\n",
@@ -920,7 +920,7 @@ void set_defaults() {
   gip = inet_addr("0.0.0.0");
 
   l = ETHER_ADDR_LEN;
-  ether_dst = libnet_hex_aton((int8_t *)"ff:ff:ff:ff:ff:ff", &l);
+  ether_dst = libnet_hex_aton("ff:ff:ff:ff:ff:ff", &l);
 
   ipv4_tos = 0;
   ipv4_id = 0;
