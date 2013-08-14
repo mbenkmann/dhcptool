@@ -50,6 +50,77 @@ char libnet_errbuf[LIBNET_ERRBUF_SIZE] = "";
 char pcap_errbuf[PCAP_ERRBUF_SIZE] = "";
 
 
+#define set(var, fmt,...) { char* s; if (asprintf(&s,fmt,__VA_ARGS__)>=0) { setenv(var,s,1); free(s);} }
+
+const char* raw_format[] = { 
+"$DHCP_WHAT","\n",
+"xid:        ","$xid","\n",
+"secs:       ","$secs","\n",
+"flags:      ","$flags","\n",
+"cip:        ","$cip","\n",
+"yip:        ","$yip","\n",
+"sip:        ","$sip","\n",
+"gip:        ","$gip","\n",
+"chaddr:     ","$chaddr","\n",
+"sname:      ","$sname","\n",
+"file:       ","$file","\n",
+"$options",
+NULL};
+
+const char* dhcpd_conf_format[] = {
+"$DHCP_WHAT", " to request from ","$cip",":\n\n",
+"host ","$yip"," {\n",
+"  hardware ethernet ","$macaddr",";\n",
+"  fixed-address ","$yip",";\n",
+"  filename \"", "$file", "\";\n",
+"$options",
+"  server-name \"","$sname","\";\n",
+"  next-server ", "$sip",";\n",
+"}\n",
+NULL
+};
+
+const char* raw_option_format[] = {
+"Option ","$opnum", " (","$dhcp_optiondesc","): ","$opval",
+NULL
+};
+
+const char* conf_option_format[] = {
+"  option ","$dhcpd_conf_option"," ","$opdelim","$opval","$opdelim",";",
+NULL
+};
+
+/*const char** format = raw_format;
+const char** option_format = raw_option_format;*/
+const char** format = dhcpd_conf_format;
+const char** option_format = conf_option_format;
+
+char* get(const char* name) {
+  char* val = getenv(name);
+  if (val == NULL) { return ""; }
+  return val;
+}
+
+char* expand(const char** fmt) {
+  char* result = strdup("");
+  while (*fmt != NULL) {
+    if ((*fmt)[0] == '$') {
+      char* new_result;
+      if (asprintf(&new_result, "%s%s",result,get((*fmt)+1)) >= 0) {
+        free(result);
+        result = new_result; 
+      }
+    } else {
+      char* new_result;
+      if (asprintf(&new_result, "%s%s",result,*fmt) >= 0) {
+        free(result);
+        result = new_result; 
+      }
+    }
+    fmt++;
+  }
+  return result;
+}
 
 void usage(char *errstr) {
   if (errstr != NULL) {
@@ -794,34 +865,46 @@ void pcap_callback(u_int8_t * userdata,
   if (dhcp_hdr->dhcp_opcode == LIBNET_DHCP_REQUEST) {
     if (verbosity < 2)
       return;  /* ignore reuqest packets if verbosity is low */
-    printf("DHCP REQUEST\n");
+    set("DHCP_WHAT","%s","DHCP REQUEST");
   }
-  else if (dhcp_hdr->dhcp_opcode == LIBNET_DHCP_REPLY)
-    printf("DHCP REPLY\n");
-  else {
+  else if (dhcp_hdr->dhcp_opcode == LIBNET_DHCP_REPLY) {
+    set("DHCP_WHAT","%s","DHCP REPLY");
+  } else {
     printf("UNKNOWN OPCODE (%u)!\n", dhcp_hdr->dhcp_opcode);
     return;
   }
-  printf("xid:        %u\n", (u_int32_t)ntohl(dhcp_hdr->dhcp_xid));
-  printf("secs:       %u\n", (u_int32_t)ntohs(dhcp_hdr->dhcp_secs));
-  printf("flags:      %u\n", (u_int32_t)ntohs(dhcp_hdr->dhcp_flags));
-  printf("cip:        %s\n", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_cip))));
-  printf("yip:        %s\n", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_yip))));
-  printf("sip:        %s\n", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_sip))));
-  printf("gip:        %s\n", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_gip))));
-  printf("chaddr:     ");
-  for (i = 0; i < ETHER_ADDR_LEN; i++)
-    printf("%02x ", dhcp_hdr->dhcp_chaddr[i]);
-  printf("\n");
-  printf("sname:      %.64s\n", dhcp_hdr->dhcp_sname);
-  printf("file:       %.128s\n", dhcp_hdr->dhcp_file);
+  set("xid","%u", (u_int32_t)ntohl(dhcp_hdr->dhcp_xid));
+  set("secs","%u", (u_int32_t)ntohs(dhcp_hdr->dhcp_secs));
+  set("flags","%u", (u_int32_t)ntohs(dhcp_hdr->dhcp_flags));
+  set("cip","%s", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_cip))));
+  set("yip","%s", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_yip))));
+  set("sip","%s", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_sip))));
+  set("gip","%s", inet_ntoa(*((struct in_addr *)&(dhcp_hdr->dhcp_gip))));
+  char buf1[ETHER_ADDR_LEN*3+1];
+  char buf2[ETHER_ADDR_LEN*3+1];
+  buf1[ETHER_ADDR_LEN*3]=0;
+  buf2[ETHER_ADDR_LEN*3]=0;
+  for (i = 0; i < ETHER_ADDR_LEN; i++) {
+    sprintf(buf1+i*3,"%02x ", dhcp_hdr->dhcp_chaddr[i]);
+    sprintf(buf2+i*3,"%02x:", dhcp_hdr->dhcp_chaddr[i]);
+  }
+  if (ETHER_ADDR_LEN > 0) {
+    buf1[ETHER_ADDR_LEN*3-1] = 0;
+    buf2[ETHER_ADDR_LEN*3-1] = 0;
+  }
+  set("chaddr","%s",buf1);
+  set("macaddr","%s",buf2);
+  set("sname","%.64s", dhcp_hdr->dhcp_sname);
+  set("file","%.128s", dhcp_hdr->dhcp_file);
+  
+  set("options","%s", "");
+  
   remaining_data -= sizeof(struct libnet_dhcpv4_hdr);
   charp = (u_int8_t *)(dhcp_hdr + 1);
   while (remaining_data > 0) {
     u_int8_t opnum, oplen;
     opnum = *charp;
     if (opnum == 0xff) {
-      printf("Option 255:\n");
       break;
     }
     if (--remaining_data <= 0) break;
@@ -831,70 +914,86 @@ void pcap_callback(u_int8_t * userdata,
     charp++;
     if (oplen > remaining_data) break;
     remaining_data -= oplen;
-    printf("Option %03u (%16s): ", opnum, _dhcp_optiondesc[opnum]);
+    set("opnum","%03u", opnum);
+    set("dhcp_optiondesc","%16s", _dhcp_optiondesc[opnum]);
+    set("opval","%s","");
+    set("opdelim","%s","");
+    if (_dhcpd_conf_option[opnum][0] == 0) {
+      set("dhcpd_conf_option","\"%s\"", _dhcp_optiondesc[opnum])
+    } else {
+      set("dhcpd_conf_option","%s", _dhcpd_conf_option[opnum]);
+    }
     switch (_dhcp_option_valuetype[opnum]) {
       case DHCP_OPTIONTYPE_NONE: 
-        printf("\n");
         break;
       case DHCP_OPTIONTYPE_INT8: 
         for (i = 0; i < oplen; i++, charp++) 
-          printf("%d ", (int32_t)*charp);
+          set("opval","%s%d ", get("opval"),(int32_t)*charp);
         break;
       case DHCP_OPTIONTYPE_UINT8: 
         for (i = 0; i < oplen; i++, charp++) 
-          printf("%u ", (u_int32_t)*charp);
+          set("opval","%s%u ", get("opval"), (u_int32_t)*charp);
         break;
       case DHCP_OPTIONTYPE_INT16:
         for (i = 0; i < oplen; i += 2, charp += 2)
-          printf("%d ", (int32_t)ntohs(*((short *)(charp))));
+          set("opval","%s%d ", get("opval"), (int32_t)ntohs(*((short *)(charp))));
         break;
       case DHCP_OPTIONTYPE_UINT16:
         for (i = 0; i < oplen; i += 2, charp += 2)
-          printf("%u ", (u_int32_t)ntohs(*((unsigned short *)(charp))));
+          set("opval","%s%u ", get("opval"), (u_int32_t)ntohs(*((unsigned short *)(charp))));
         break;
       case DHCP_OPTIONTYPE_INT32:
         for (i = 0; i < oplen; i += 4, charp += 4)
-          printf("%d ", (int32_t)ntohl(*((int *)(charp))));
+          set("opval","%s%d ", get("opval"), (int32_t)ntohl(*((int *)(charp))));
         break;
       case DHCP_OPTIONTYPE_UINT32:
         for (i = 0; i < oplen; i += 4, charp += 4)
-          printf("%u ", (u_int32_t)ntohl(*((unsigned int *)(charp))));
+          set("opval", "%s%u ", get("opval"), (u_int32_t)ntohl(*((unsigned int *)(charp))));
         break;
       case DHCP_OPTIONTYPE_IPV4:
         for (i = 0; i < oplen; i += 4, charp += 4)
-          printf("%s ", inet_ntoa(*((struct in_addr *)charp)));
+          set("opval", "%s%s ", get("opval"), inet_ntoa(*((struct in_addr *)charp)));
         break;
       case DHCP_OPTIONTYPE_IPV4PAIR:
         for (i = 0; i < oplen; i += 8, charp += 8) {
-          printf("%s:", inet_ntoa(*((struct in_addr *)charp)));
-          printf("%s ", inet_ntoa(*((struct in_addr *)charp+4)));
+          set("opval", "%s%s:", get("opval"), inet_ntoa(*((struct in_addr *)charp)));
+          set("opval", "%s%s ", get("opval"), inet_ntoa(*((struct in_addr *)charp+4)));
         }
         break;
       case DHCP_OPTIONTYPE_STRING:
+        set("opdelim","%s","\"");
         for (i = 0; i < oplen; i++, charp++)
-          printf("%c", *charp);
+          set("opval","%s%c", get("opval"), *charp);
         break;
       case DHCP_OPTIONTYPE_BOOL8:
         for (i = 0; i < oplen; i++, charp++) {
           switch (*charp) {
-            case 0: printf("ON");
+            case 0: set("opval","%s%s",get("opval"),"ON");
                     break;
-            case 1: printf("OFF");
+            case 1: set("opval","%s%s",get("opval"),"OFF");
                     break;
-            default: printf("UNKNOWN");
+            default: set("opval","%s%s",get("opval"),"UNKNOWN");
           }
         }
         break;
       case DHCP_OPTIONTYPE_OPAQUE:
       case DHCP_OPTIONTYPE_UNUSED:
         for (i = 0; i < oplen; i++, charp++)
-          printf("%02x", *charp);
+          set("opval","%s%02x", get("opval"), *charp);
         break;
       default:
-        printf("This shouldn't happen\n");
+        set("opval","%s","This shouldn't happen");
     }
-    printf("\n");
+    
+    char* opstr = expand(option_format);
+    set("options", "%s%s\n", get("options"), opstr);
+    free(opstr);
   }
+  
+  char* result = expand(format);
+  printf("%s",result);
+  free(result);
+  
   if (reply_count != 0) {
     if (--reply_count == 0)
       exit(0);
