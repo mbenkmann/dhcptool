@@ -234,6 +234,14 @@ Option data type: 32-bit IPv4 address(es), network byte order
 .PP
 .SH EXAMPLES
 .br
+DHCP DISCOVER all information about the client with MAC 00:24:21:0b:4b:df, using
+interface eth0:
+.RS
+.PP
+# dhcptool -i eth0 -o discover -h 00:24:21:0b:4b:df
+.RE
+.PP
+.br
 Broadcasting a DHCP DISCOVER request through interface em0, asking
 for parameters 1 (subnet mask), 3 (router), 6 (domain name server)
 and using transaction ID 12345:
