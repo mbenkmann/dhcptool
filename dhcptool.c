@@ -830,7 +830,7 @@ void pcap_callback(u_int8_t * userdata,
     charp++;
     if (oplen > remaining_data) break;
     remaining_data -= oplen;
-    printf("Option %03u: ", opnum);
+    printf("Option %03u (%16s): ", opnum, _dhcp_optiondesc[opnum]);
     switch (_dhcp_option_valuetype[opnum]) {
       case DHCP_OPTIONTYPE_NONE: 
         printf("\n");
