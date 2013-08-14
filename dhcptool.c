@@ -812,6 +812,8 @@ void pcap_callback(u_int8_t * userdata,
   for (i = 0; i < ETHER_ADDR_LEN; i++)
     printf("%02x ", dhcp_hdr->dhcp_chaddr[i]);
   printf("\n");
+  printf("sname:      %.64s\n", dhcp_hdr->dhcp_sname);
+  printf("file:       %.128s\n", dhcp_hdr->dhcp_file);
   remaining_data -= sizeof(struct libnet_dhcpv4_hdr);
   charp = (u_int8_t *)(dhcp_hdr + 1);
   while (remaining_data > 0) {
