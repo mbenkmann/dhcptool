@@ -6,6 +6,7 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <time.h>
 #include "dhcptool.h"
 #include "dhcp-options.h"
 
