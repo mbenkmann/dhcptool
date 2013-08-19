@@ -68,7 +68,7 @@ const char* raw_format[] = {
 NULL};
 
 const char* dhcpd_conf_format[] = {
-"$DHCP_WHAT", " to request from ","$cip",":\n\n",
+"$DHCP_WHAT", " (requesting client: ","$cip","):\n\n",
 "host ","$yip"," {\n",
 "  hardware ethernet ","$macaddr",";\n",
 "  fixed-address ","$yip",";\n",
