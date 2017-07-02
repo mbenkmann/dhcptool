@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <time.h>
+#include <netinet/ip.h>
 #include "dhcptool.h"
 #include "dhcp-options.h"
 
